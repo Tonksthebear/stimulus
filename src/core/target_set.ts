@@ -1,5 +1,4 @@
 import { Scope } from "./scope"
-import { attributeValueContainsToken } from "./selectors"
 
 export class TargetSet {
   readonly scope: Scope
@@ -26,68 +25,84 @@ export class TargetSet {
 
   find(...targetNames: string[]) {
     return targetNames.reduce(
-      (target, targetName) => target || this.findTarget(targetName) || this.findLegacyTarget(targetName),
+      (target, targetName) => target || this.findTarget(targetName),
       undefined as Element | undefined
     )
   }
 
   findAll(...targetNames: string[]) {
     return targetNames.reduce(
-      (targets, targetName) => [
-        ...targets,
-        ...this.findAllTargets(targetName),
-        ...this.findAllLegacyTargets(targetName),
-      ],
+      (targets, targetName) => [...targets, ...this.findAllTargets(targetName)],
       [] as Element[]
     )
   }
 
   private findTarget(targetName: string) {
-    const selector = this.getSelectorForTargetName(targetName)
-    return this.scope.findElement(selector)
+    // First look in the controller's element
+    const attributeName = this.scope.schema.targetAttributeForScope(this.scope.identifier)
+    const selector = `[${attributeName}~="${targetName}"]`
+
+    // Check if the element itself matches
+    if (this.element.matches(selector)) {
+      return this.element
+    }
+
+    // Look in the controller's element
+    const elementTarget = this.scope.queryElements(selector).find(this.scope.containsElement)
+    if (elementTarget) {
+      return elementTarget
+    }
+
+    // Look in portal elements
+    return this.findTargetInPortals(targetName)
   }
 
   private findAllTargets(targetName: string) {
-    const selector = this.getSelectorForTargetName(targetName)
-    return this.scope.findAllElements(selector)
+    const attributeName = this.scope.schema.targetAttributeForScope(this.scope.identifier)
+    const selector = `[${attributeName}~="${targetName}"]`
+
+    // Get targets from the controller's element
+    const elementTargets = [
+      ...(this.element.matches(selector) ? [this.element] : []),
+      ...this.scope.queryElements(selector).filter(this.scope.containsElement)
+    ]
+
+    // Get targets from portal elements
+    const portalTargets = this.findAllTargetsInPortals(targetName)
+
+    return [...elementTargets, ...portalTargets]
   }
 
-  private getSelectorForTargetName(targetName: string) {
-    const attributeName = this.schema.targetAttributeForScope(this.identifier)
-    return attributeValueContainsToken(attributeName, targetName)
-  }
+  private findTargetInPortals(targetName: string) {
+    // Get all portal elements
+    const portalElements = this.scope.portals.findAll()
 
-  private findLegacyTarget(targetName: string) {
-    const selector = this.getLegacySelectorForTargetName(targetName)
-    return this.deprecate(this.scope.findElement(selector), targetName)
-  }
-
-  private findAllLegacyTargets(targetName: string) {
-    const selector = this.getLegacySelectorForTargetName(targetName)
-    return this.scope.findAllElements(selector).map((element) => this.deprecate(element, targetName))
-  }
-
-  private getLegacySelectorForTargetName(targetName: string) {
-    const targetDescriptor = `${this.identifier}.${targetName}`
-    return attributeValueContainsToken(this.schema.targetAttribute, targetDescriptor)
-  }
-
-  private deprecate<T>(element: T, targetName: string) {
-    if (element) {
-      const { identifier } = this
-      const attributeName = this.schema.targetAttribute
-      const revisedAttributeName = this.schema.targetAttributeForScope(identifier)
-      this.guide.warn(
-        element,
-        `target:${targetName}`,
-        `Please replace ${attributeName}="${identifier}.${targetName}" with ${revisedAttributeName}="${targetName}". ` +
-          `The ${attributeName} attribute is deprecated and will be removed in a future version of Stimulus.`
-      )
+    // Look for the target in each portal element
+    for (const portalElement of portalElements) {
+      const attributeName = this.scope.schema.targetAttributeForScope(this.scope.identifier)
+      const selector = `[${attributeName}~="${targetName}"]`
+      const target = portalElement.querySelector(selector)
+      if (target) {
+        return target
+      }
     }
-    return element
+
+    return undefined
   }
 
-  private get guide() {
-    return this.scope.guide
+  private findAllTargetsInPortals(targetName: string) {
+    // Get all portal elements
+    const portalElements = this.scope.portals.findAll()
+
+    // Look for all targets in each portal element
+    const targets: Element[] = []
+    for (const portalElement of portalElements) {
+      const attributeName = this.scope.schema.targetAttributeForScope(this.scope.identifier)
+      const selector = `[${attributeName}~="${targetName}"]`
+      const portalTargets = Array.from(portalElement.querySelectorAll(selector))
+      targets.push(...portalTargets)
+    }
+
+    return targets
   }
 }

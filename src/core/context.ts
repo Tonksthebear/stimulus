@@ -137,12 +137,12 @@ export class Context implements ErrorHandler, TargetObserverDelegate, OutletObse
 
   // Portal observer delegate
 
-  portalConnected(portal: Controller, element: Element, name: string) {
-    this.invokeControllerMethod(`${namespaceCamelize(name)}PortalConnected`, portal, element)
+  portalConnected(element: Element, name: string) {
+    this.invokeControllerMethod(`${namespaceCamelize(name)}PortalConnected`, element)
   }
 
-  portalDisconnected(portal: Controller, element: Element, name: string) {
-    this.invokeControllerMethod(`${namespaceCamelize(name)}PortalDisconnected`, portal, element)
+  portalDisconnected(element: Element, name: string) {
+    this.invokeControllerMethod(`${namespaceCamelize(name)}PortalDisconnected`, element)
   }
 
   // Private

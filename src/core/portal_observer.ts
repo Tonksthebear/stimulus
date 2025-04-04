@@ -2,23 +2,21 @@ import { Multimap } from "../multimap"
 import { AttributeObserver, AttributeObserverDelegate } from "../mutation-observers"
 import { SelectorObserver, SelectorObserverDelegate } from "../mutation-observers"
 import { Context } from "./context"
-import { Controller } from "./controller"
 
 import { readInheritableStaticArrayValues } from "./inheritable_statics"
 
 type PortalObserverDetails = { portalName: string }
 
 export interface PortalObserverDelegate {
-  portalConnected(portal: Controller, element: Element, portalName: string): void
-  portalDisconnected(portal: Controller, element: Element, portalName: string): void
+  portalConnected(element: Element, portalName: string): void
+  portalDisconnected(element: Element, portalName: string): void
 }
 
 export class PortalObserver implements AttributeObserverDelegate, SelectorObserverDelegate {
   started: boolean
   readonly context: Context
   readonly delegate: PortalObserverDelegate
-  readonly portalsByName: Multimap<string, Controller>
-  readonly portalElementsByName: Multimap<string, Element>
+  readonly portalsByName: Multimap<string, Element>
   private selectorObserverMap: Map<string, SelectorObserver>
   private attributeObserverMap: Map<string, AttributeObserver>
 
@@ -27,7 +25,6 @@ export class PortalObserver implements AttributeObserverDelegate, SelectorObserv
     this.context = context
     this.delegate = delegate
     this.portalsByName = new Multimap()
-    this.portalElementsByName = new Multimap()
     this.selectorObserverMap = new Map()
     this.attributeObserverMap = new Map()
   }
@@ -74,28 +71,27 @@ export class PortalObserver implements AttributeObserverDelegate, SelectorObserv
   // Selector observer delegate
 
   selectorMatched(element: Element, _selector: string, { portalName }: PortalObserverDetails) {
-    const portal = this.getPortal(element, portalName)
+    const portalSelector = element.getAttribute(this.schema.portalAttributeForScope(this.identifier, portalName))
+    if (!portalSelector) return
 
-    if (portal) {
-      this.connectPortal(portal, element, portalName)
-    }
+    // Find all matching portal elements
+    const portalElements = Array.from(document.querySelectorAll(portalSelector))
+    portalElements.forEach(portalElement => {
+      this.connectPortal(portalElement, portalName)
+    })
   }
 
   selectorUnmatched(element: Element, _selector: string, { portalName }: PortalObserverDetails) {
-    const portal = this.getPortalFromMap(element, portalName)
-
-    if (portal) {
-      this.disconnectPortal(portal, element, portalName)
-    }
+    const portalElements = this.portalsByName.getValuesForKey(portalName)
+    portalElements.forEach(portalElement => {
+      this.disconnectPortal(portalElement, portalName)
+    })
   }
 
   selectorMatchElement(element: Element, { portalName }: PortalObserverDetails) {
     const selector = this.selector(portalName)
-    const hasPortal = this.hasPortal(element, portalName)
-    const hasPortalController = element.matches(`[${this.schema.controllerAttribute}~=${portalName}]`)
-
     if (selector) {
-      return hasPortal && hasPortalController && element.matches(selector)
+      return element.matches(selector)
     } else {
       return false
     }
@@ -105,7 +101,6 @@ export class PortalObserver implements AttributeObserverDelegate, SelectorObserv
 
   elementMatchedAttribute(_element: Element, attributeName: string) {
     const portalName = this.getPortalNameFromPortalAttributeName(attributeName)
-
     if (portalName) {
       this.updateSelectorObserverForPortal(portalName)
     }
@@ -113,7 +108,6 @@ export class PortalObserver implements AttributeObserverDelegate, SelectorObserv
 
   elementAttributeValueChanged(_element: Element, attributeName: string) {
     const portalName = this.getPortalNameFromPortalAttributeName(attributeName)
-
     if (portalName) {
       this.updateSelectorObserverForPortal(portalName)
     }
@@ -121,7 +115,6 @@ export class PortalObserver implements AttributeObserverDelegate, SelectorObserv
 
   elementUnmatchedAttribute(_element: Element, attributeName: string) {
     const portalName = this.getPortalNameFromPortalAttributeName(attributeName)
-
     if (portalName) {
       this.updateSelectorObserverForPortal(portalName)
     }
@@ -129,30 +122,26 @@ export class PortalObserver implements AttributeObserverDelegate, SelectorObserv
 
   // Portal management
 
-  connectPortal(portal: Controller, element: Element, portalName: string) {
-    if (!this.portalElementsByName.has(portalName, element)) {
-      this.portalsByName.add(portalName, portal)
-      this.portalElementsByName.add(portalName, element)
-      this.selectorObserverMap.get(portalName)?.pause(() => this.delegate.portalConnected(portal, element, portalName))
+  connectPortal(element: Element, portalName: string) {
+    if (!this.portalsByName.has(portalName, element)) {
+      this.portalsByName.add(portalName, element)
+      this.selectorObserverMap.get(portalName)?.pause(() => this.delegate.portalConnected(element, portalName))
     }
   }
 
-  disconnectPortal(portal: Controller, element: Element, portalName: string) {
-    if (this.portalElementsByName.has(portalName, element)) {
-      this.portalsByName.delete(portalName, portal)
-      this.portalElementsByName.delete(portalName, element)
+  disconnectPortal(element: Element, portalName: string) {
+    if (this.portalsByName.has(portalName, element)) {
+      this.portalsByName.delete(portalName, element)
       this.selectorObserverMap
         .get(portalName)
-        ?.pause(() => this.delegate.portalDisconnected(portal, element, portalName))
+        ?.pause(() => this.delegate.portalDisconnected(element, portalName))
     }
   }
 
   disconnectAllPortals() {
-    for (const portalName of this.portalElementsByName.keys) {
-      for (const element of this.portalElementsByName.getValuesForKey(portalName)) {
-        for (const portal of this.portalsByName.getValuesForKey(portalName)) {
-          this.disconnectPortal(portal, element, portalName)
-        }
+    for (const portalName of this.portalsByName.keys) {
+      for (const element of this.portalsByName.getValuesForKey(portalName)) {
+        this.disconnectPortal(element, portalName)
       }
     }
   }
@@ -161,7 +150,6 @@ export class PortalObserver implements AttributeObserverDelegate, SelectorObserv
 
   private updateSelectorObserverForPortal(portalName: string) {
     const observer = this.selectorObserverMap.get(portalName)
-
     if (observer) {
       observer.selector = this.selector(portalName)
     }
@@ -169,19 +157,17 @@ export class PortalObserver implements AttributeObserverDelegate, SelectorObserv
 
   private setupSelectorObserverForPortal(portalName: string) {
     const selector = this.selector(portalName)
-    const selectorObserver = new SelectorObserver(document.body, selector!, this, { portalName })
-
-    this.selectorObserverMap.set(portalName, selectorObserver)
-
-    selectorObserver.start()
+    if (selector) {
+      const selectorObserver = new SelectorObserver(document.body, selector, this, { portalName })
+      this.selectorObserverMap.set(portalName, selectorObserver)
+      selectorObserver.start()
+    }
   }
 
   private setupAttributeObserverForPortal(portalName: string) {
     const attributeName = this.attributeNameForPortalName(portalName)
     const attributeObserver = new AttributeObserver(this.scope.element, attributeName, this)
-
     this.attributeObserverMap.set(portalName, attributeObserver)
-
     attributeObserver.start()
   }
 
@@ -201,14 +187,11 @@ export class PortalObserver implements AttributeObserverDelegate, SelectorObserv
 
   private get portalDependencies() {
     const dependencies = new Multimap<string, string>()
-
     this.router.modules.forEach((module) => {
       const constructor = module.definition.controllerConstructor
       const portals = readInheritableStaticArrayValues(constructor, "portals")
-
       portals.forEach((portal) => dependencies.add(portal, module.identifier))
     })
-
     return dependencies
   }
 
@@ -225,35 +208,23 @@ export class PortalObserver implements AttributeObserverDelegate, SelectorObserv
     return this.router.contexts.filter((context) => identifiers.includes(context.identifier))
   }
 
-  private hasPortal(element: Element, portalName: string) {
-    return !!this.getPortal(element, portalName) || !!this.getPortalFromMap(element, portalName)
-  }
-
-  private getPortal(element: Element, portalName: string) {
-    return this.application.getControllerForElementAndIdentifier(element, portalName)
-  }
-
-  private getPortalFromMap(element: Element, portalName: string) {
-    return this.portalsByName.getValuesForKey(portalName).find((portal) => portal.element === element)
-  }
-
-  private get scope() {
-    return this.context.scope
-  }
-
   private get schema() {
-    return this.context.schema
+    return this.scope.schema
   }
 
   private get identifier() {
-    return this.context.identifier
+    return this.scope.identifier
+  }
+
+  private get router() {
+    return this.application.router
   }
 
   private get application() {
     return this.context.application
   }
 
-  private get router() {
-    return this.application.router
+  private get scope() {
+    return this.context.scope
   }
 }

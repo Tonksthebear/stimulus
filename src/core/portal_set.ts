@@ -46,26 +46,21 @@ export class PortalSet {
 
   private findPortal(portalName: string) {
     const selector = this.getSelectorForPortalName(portalName)
-    if (selector) return this.findElement(selector, portalName)
+    if (selector) return this.findElement(selector)
   }
 
   private findAllPortals(portalName: string) {
     const selector = this.getSelectorForPortalName(portalName)
-    return selector ? this.findAllElements(selector, portalName) : []
+    return selector ? this.findAllElements(selector) : []
   }
 
-  private findElement(selector: string, portalName: string): Element | undefined {
-    const elements = this.scope.queryElements(selector)
-    return elements.filter((element) => this.matchesElement(element, selector, portalName))[0]
+  private findElement(selector: string): Element | undefined {
+    // Use document scope to find elements anywhere in the DOM
+    return document.querySelector(selector) || undefined
   }
 
-  private findAllElements(selector: string, portalName: string): Element[] {
-    const elements = this.scope.queryElements(selector)
-    return elements.filter((element) => this.matchesElement(element, selector, portalName))
-  }
-
-  private matchesElement(element: Element, selector: string, portalName: string): boolean {
-    const controllerAttribute = element.getAttribute(this.scope.schema.controllerAttribute) || ""
-    return element.matches(selector) && controllerAttribute.split(" ").includes(portalName)
+  private findAllElements(selector: string): Element[] {
+    // Use document scope to find elements anywhere in the DOM
+    return Array.from(document.querySelectorAll(selector))
   }
 }
