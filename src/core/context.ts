@@ -9,9 +9,10 @@ import { Scope } from "./scope"
 import { ValueObserver } from "./value_observer"
 import { TargetObserver, TargetObserverDelegate } from "./target_observer"
 import { OutletObserver, OutletObserverDelegate } from "./outlet_observer"
+import { PortalObserver, PortalObserverDelegate } from "./portal_observer"
 import { namespaceCamelize } from "./string_helpers"
 
-export class Context implements ErrorHandler, TargetObserverDelegate, OutletObserverDelegate {
+export class Context implements ErrorHandler, TargetObserverDelegate, OutletObserverDelegate, PortalObserverDelegate {
   readonly module: Module
   readonly scope: Scope
   readonly controller: Controller
@@ -19,6 +20,7 @@ export class Context implements ErrorHandler, TargetObserverDelegate, OutletObse
   private valueObserver: ValueObserver
   private targetObserver: TargetObserver
   private outletObserver: OutletObserver
+  private portalObserver: PortalObserver
 
   constructor(module: Module, scope: Scope) {
     this.module = module
@@ -28,6 +30,7 @@ export class Context implements ErrorHandler, TargetObserverDelegate, OutletObse
     this.valueObserver = new ValueObserver(this, this.controller)
     this.targetObserver = new TargetObserver(this, this)
     this.outletObserver = new OutletObserver(this, this)
+    this.portalObserver = new PortalObserver(this, this)
 
     try {
       this.controller.initialize()
@@ -42,6 +45,7 @@ export class Context implements ErrorHandler, TargetObserverDelegate, OutletObse
     this.valueObserver.start()
     this.targetObserver.start()
     this.outletObserver.start()
+    this.portalObserver.start()
 
     try {
       this.controller.connect()
@@ -53,6 +57,7 @@ export class Context implements ErrorHandler, TargetObserverDelegate, OutletObse
 
   refresh() {
     this.outletObserver.refresh()
+    this.portalObserver.refresh()
   }
 
   disconnect() {
@@ -67,6 +72,7 @@ export class Context implements ErrorHandler, TargetObserverDelegate, OutletObse
     this.targetObserver.stop()
     this.valueObserver.stop()
     this.bindingObserver.stop()
+    this.portalObserver.stop()
   }
 
   get application(): Application {
@@ -127,6 +133,16 @@ export class Context implements ErrorHandler, TargetObserverDelegate, OutletObse
 
   outletDisconnected(outlet: Controller, element: Element, name: string) {
     this.invokeControllerMethod(`${namespaceCamelize(name)}OutletDisconnected`, outlet, element)
+  }
+
+  // Portal observer delegate
+
+  portalConnected(portal: Controller, element: Element, name: string) {
+    this.invokeControllerMethod(`${namespaceCamelize(name)}PortalConnected`, portal, element)
+  }
+
+  portalDisconnected(portal: Controller, element: Element, name: string) {
+    this.invokeControllerMethod(`${namespaceCamelize(name)}PortalDisconnected`, portal, element)
   }
 
   // Private

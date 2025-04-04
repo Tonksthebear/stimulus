@@ -4,6 +4,7 @@ export interface Schema {
   targetAttribute: string
   targetAttributeForScope(identifier: string): string
   outletAttributeForScope(identifier: string, outlet: string): string
+  portalAttributeForScope(identifier: string, portal: string): string
   keyMappings: { [key: string]: string }
 }
 
@@ -13,6 +14,7 @@ export const defaultSchema: Schema = {
   targetAttribute: "data-target",
   targetAttributeForScope: (identifier) => `data-${identifier}-target`,
   outletAttributeForScope: (identifier, outlet) => `data-${identifier}-${outlet}-outlet`,
+  portalAttributeForScope: (identifier, portal) => `data-${identifier}-${portal}-portal`,
   keyMappings: {
     enter: "Enter",
     tab: "Tab",

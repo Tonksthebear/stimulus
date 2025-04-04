@@ -3,6 +3,7 @@ import { ClassPropertiesBlessing } from "./class_properties"
 import { Constructor } from "./constructor"
 import { Context } from "./context"
 import { OutletPropertiesBlessing } from "./outlet_properties"
+import { PortalPropertiesBlessing } from "./portal_properties"
 import { TargetPropertiesBlessing } from "./target_properties"
 import { ValuePropertiesBlessing, ValueDefinitionMap } from "./value_properties"
 
@@ -22,9 +23,11 @@ export class Controller<ElementType extends Element = Element> {
     TargetPropertiesBlessing,
     ValuePropertiesBlessing,
     OutletPropertiesBlessing,
+    PortalPropertiesBlessing,
   ]
   static targets: string[] = []
   static outlets: string[] = []
+  static portals: string[] = []
   static values: ValueDefinitionMap = {}
 
   static get shouldLoad() {
@@ -63,6 +66,10 @@ export class Controller<ElementType extends Element = Element> {
 
   get outlets() {
     return this.scope.outlets
+  }
+
+  get portals() {
+    return this.scope.portals
   }
 
   get classes() {

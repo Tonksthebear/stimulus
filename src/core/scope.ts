@@ -6,6 +6,7 @@ import { Schema } from "./schema"
 import { attributeValueContainsToken } from "./selectors"
 import { TargetSet } from "./target_set"
 import { OutletSet } from "./outlet_set"
+import { PortalSet } from "./portal_set"
 
 export class Scope {
   readonly schema: Schema
@@ -13,6 +14,7 @@ export class Scope {
   readonly identifier: string
   readonly guide: Guide
   readonly outlets: OutletSet
+  readonly portals: PortalSet
   readonly targets = new TargetSet(this)
   readonly classes = new ClassMap(this)
   readonly data = new DataMap(this)
@@ -23,6 +25,7 @@ export class Scope {
     this.identifier = identifier
     this.guide = new Guide(logger)
     this.outlets = new OutletSet(this.documentScope, element)
+    this.portals = new PortalSet(this.documentScope, element)
   }
 
   findElement(selector: string): Element | undefined {
